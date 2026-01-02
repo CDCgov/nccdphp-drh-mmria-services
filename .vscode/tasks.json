@@ -15,6 +15,9 @@
       "label": "🔄 Pull Common Subtree - Services",
       "type": "shell",
       "command": "cd $(git rev-parse --show-toplevel) && git subtree pull --prefix=common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash",
+      "options": {
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}"
+      },
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -28,10 +31,10 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "Copy-Item -Path 'common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format 'yyyy-MM-dd HH:mm')\"; git push origin main; Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
+        "Copy-Item -Path 'common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format 'yyyy-MM-dd HH:mm')\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
       ],
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}"
       },
       "problemMatcher": [],
       "presentation": {

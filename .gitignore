@@ -263,6 +263,9 @@ paket-files/
 .idea/
 *.sln.iml
 
+# Local configuration files (credentials, sensitive data)
+**/appsettings.local.json
+**/appsettings.*.local.json
 
 test.http
 test.http.old
