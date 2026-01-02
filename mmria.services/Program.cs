@@ -46,6 +46,9 @@ public sealed class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        // Add appsettings.local.json to configuration
+        builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
+
         configuration = builder.Configuration;
 
         if (bool.Parse (configuration["mmria_settings:is_environment_based"])) 
