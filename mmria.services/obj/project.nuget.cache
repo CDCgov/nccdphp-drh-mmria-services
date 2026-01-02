@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "1zEjLCLubf0=",
+  "dgSpecHash": "pqlMPoNnVlM=",
   "success": true,
-  "projectFilePath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.services\\mmria.services.csproj",
+  "projectFilePath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria-services\\mmria.services\\mmria.services.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\ptr8\\.nuget\\packages\\akka\\1.5.52\\akka.1.5.52.nupkg.sha512",
     "C:\\Users\\ptr8\\.nuget\\packages\\akka.analyzers\\0.3.3\\akka.analyzers.0.3.3.nupkg.sha512",

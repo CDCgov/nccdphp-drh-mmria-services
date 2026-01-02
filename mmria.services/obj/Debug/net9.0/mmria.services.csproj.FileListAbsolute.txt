@@ -56,3 +56,13 @@ C:\Users\ptr8\source\repos\nccdphp-drh-mmria\source-code\mmria\mmria.services\ob
 C:\Users\ptr8\source\repos\nccdphp-drh-mmria\source-code\mmria\mmria.services\obj\Debug\net9.0\mmria.services.pdb
 C:\Users\ptr8\source\repos\nccdphp-drh-mmria\source-code\mmria\mmria.services\obj\Debug\net9.0\mmria.services.genruntimeconfig.cache
 C:\Users\ptr8\source\repos\nccdphp-drh-mmria\source-code\mmria\mmria.services\obj\Debug\net9.0\ref\mmria.services.dll
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.csproj.AssemblyReference.cache
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.AssemblyInfoInputs.cache
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.AssemblyInfo.cs
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.csproj.CoreCompileInputs.cache
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.sourcelink.json
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.dll
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\refint\mmria.services.dll
+C:\Users\ptr8\source\repos\nccdphp-drh-mmria-services\mmria.services\obj\Debug\net9.0\mmria.services.pdb

@@ -339,26 +339,6 @@
             "rid": "win"
           }
         }
-      },
-      "mmria.common/1.0.0": {
-        "type": "project",
-        "framework": ".NETCoreApp,Version=v9.0",
-        "compile": {
-          "bin/placeholder/mmria.common.dll": {}
-        },
-        "runtime": {
-          "bin/placeholder/mmria.common.dll": {}
-        }
-      },
-      "mmria.getset/1.0.0": {
-        "type": "project",
-        "framework": ".NETCoreApp,Version=v9.0",
-        "compile": {
-          "bin/placeholder/mmria.getset.dll": {}
-        },
-        "runtime": {
-          "bin/placeholder/mmria.getset.dll": {}
-        }
       }
     }
   },
@@ -821,16 +801,6 @@
         "system.windows.extensions.nuspec",
         "useSharedDesignerContext.txt"
       ]
-    },
-    "mmria.common/1.0.0": {
-      "type": "project",
-      "path": "../mmria.common/mmria.common.csproj",
-      "msbuildProject": "../mmria.common/mmria.common.csproj"
-    },
-    "mmria.getset/1.0.0": {
-      "type": "project",
-      "path": "../mmria.getset/mmria.getset.csproj",
-      "msbuildProject": "../mmria.getset/mmria.getset.csproj"
     }
   },
   "projectFileDependencyGroups": {
@@ -839,9 +809,7 @@
       "Akka.DI.Core >= 1.4.51",
       "Akka.DI.Extensions.DependencyInjection >= 1.4.22",
       "Akka.Quartz.Actor >= 1.5.13",
-      "SharpZipLib >= 1.4.2",
-      "mmria.common >= 1.0.0",
-      "mmria.getset >= 1.0.0"
+      "SharpZipLib >= 1.4.2"
     ]
   },
   "packageFolders": {
@@ -851,11 +819,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.services\\mmria.services.csproj",
+      "projectUniqueName": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria-services\\mmria.services\\mmria.services.csproj",
       "projectName": "mmria.services",
-      "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.services\\mmria.services.csproj",
+      "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria-services\\mmria.services\\mmria.services.csproj",
       "packagesPath": "C:\\Users\\ptr8\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.services\\obj\\",
+      "outputPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria-services\\mmria.services\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -875,14 +843,7 @@
       "frameworks": {
         "net9.0": {
           "targetAlias": "net9.0",
-          "projectReferences": {
-            "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.common\\mmria.common.csproj": {
-              "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.common\\mmria.common.csproj"
-            },
-            "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.getset\\mmria.getset.csproj": {
-              "projectPath": "C:\\Users\\ptr8\\source\\repos\\nccdphp-drh-mmria\\source-code\\mmria\\mmria.getset\\mmria.getset.csproj"
-            }
-          }
+          "projectReferences": {}
         }
       },
       "warningProperties": {

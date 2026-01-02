@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("mmria.services")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8ff959fca22e7c20410473185d244389fbb73276")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5a78456d7f135f1fd7eae133479178039091d0bc")]
 [assembly: System.Reflection.AssemblyProductAttribute("mmria.services")]
 [assembly: System.Reflection.AssemblyTitleAttribute("mmria.services")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
