@@ -13,8 +13,13 @@
     },
     {
       "label": "🔄 Pull Common Subtree - Services",
-      "type": "shell",
-      "command": "cd $(git rev-parse --show-toplevel) && git subtree pull --prefix=common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash -m 'Merge subtree: nccdphp-drh-mmria-common'",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location (git rev-parse --show-toplevel); git subtree pull --prefix=common https://github.com/CDCgov/nccdphp-drh-mmria-common.git main --squash -m 'Merge subtree: nccdphp-drh-mmria-common'"
+      ],
       "options": {
         "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}"
       },
