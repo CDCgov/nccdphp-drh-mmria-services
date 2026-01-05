@@ -36,7 +36,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "Copy-Item -Path 'common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $(Get-Date -Format 'yyyy-MM-dd HH:mm')\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
+        "$dt = (Get-Date).ToString('yyyy-MM-dd HH:mm'); Copy-Item -Path 'common/*' -Destination '../nccdphp-drh-mmria-common/' -Recurse -Force; Push-Location '../nccdphp-drh-mmria-common'; git add .; if (git status --porcelain) { git commit -m \"Sync from main repo $dt\"; git pull --rebase origin main; git push origin main; if ($?) { Write-Host '✅ Pushed!' -ForegroundColor Green } else { Write-Host '❌ Push failed!' -ForegroundColor Red } } else { Write-Host 'No changes' -ForegroundColor Yellow }; Pop-Location"
       ],
       "options": {
         "cwd": "${workspaceFolder:nccdphp-drh-mmria-services}"
