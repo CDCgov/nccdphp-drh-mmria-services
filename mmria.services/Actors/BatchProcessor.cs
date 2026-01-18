@@ -105,7 +105,7 @@ public sealed class BatchProcessor : ReceiveActor
         var fet_length_is_valid = validate_length(message?.fet?.Split("\n"), fet_max_length);
 
 
-        var patt = new System.Text.RegularExpressions.Regex("[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z,a-z]{2}.[mM][oO][rR]");
+        var patt = new System.Text.RegularExpressions.Regex("[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2})|([Tt][Ee][Nn][Aa][Nn][Tt][1-5]?)).[mM][oO][rR]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         if (patt.Match(message.mor_file_name).Length == 0) 
         {
