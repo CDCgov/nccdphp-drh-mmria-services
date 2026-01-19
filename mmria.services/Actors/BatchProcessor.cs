@@ -270,7 +270,8 @@ public sealed class BatchProcessor : ReceiveActor
                         host_state = ReportingState,
                         mor = batch_tuple.Item1,
                         nat = GetAssociatedNat(nat_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
-                        fet = GetAssociatedFet(fet_list, batch_tuple.Item2.CDCUniqueID?.Trim())
+                        fet = GetAssociatedFet(fet_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
+                        BatchProcessorPath = Self.Path.ToStringWithAddress()
                     };
 
                     batchItemRouter.Tell(StartBatchItemMessage);
@@ -308,6 +309,9 @@ public sealed class BatchProcessor : ReceiveActor
                 status = batch.Status
             };
             Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
+            
+            // Save batch immediately so it's visible for tracking
+            save_batch(batch);
             
             // Batch finalization will happen when all items complete
         }
@@ -352,9 +356,40 @@ public sealed class BatchProcessor : ReceiveActor
     {
         Console.WriteLine($"Finalizing batch {batch.id}");
         
+        // Convert batch_item_set to final record results
+        var final_record_result = Convert(batch_item_set);
+        
+        // Update batch with final status and results
+        var finalBatch = new mmria.common.ije.Batch()
+        {
+            id = batch.id,
+            _rev = batch._rev,
+            date_created = batch.date_created,
+            created_by = batch.created_by,
+            date_last_updated = DateTime.UtcNow,
+            last_updated_by = batch.last_updated_by,
+            Status = mmria.common.ije.Batch.StatusEnum.Finished,
+            reporting_state = batch.reporting_state,
+            ImportDate = batch.ImportDate,
+            mor_file_name = batch.mor_file_name,
+            nat_file_name = batch.nat_file_name,
+            fet_file_name = batch.fet_file_name,
+            StatusInfo = $"Completed {final_record_result.Count} items",
+            record_result = final_record_result
+        };
+        
+        batch = finalBatch;
+        
         if(save_batch(batch))
         {
-            Console.WriteLine($"Batch {batch.id} saved successfully");
+            Console.WriteLine($"Batch {batch.id} saved successfully with {batch.record_result.Count} results");
+            
+            var BatchStatusMessage = new mmria.common.ije.BatchStatusMessage()
+            {
+                id = batch.id,
+                status = batch.Status
+            };
+            Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
         }
         else
         {
@@ -404,6 +439,7 @@ public sealed class BatchProcessor : ReceiveActor
         var new_batch = new mmria.common.ije.Batch()
         {
             id = batch.id,
+            _rev = batch._rev, 
             date_created  = batch.date_created,
             created_by = batch.created_by,
             date_last_updated  = DateTime.UtcNow,
@@ -465,10 +501,11 @@ public sealed class BatchProcessor : ReceiveActor
             {
                 result = true;
 
-
+                // Update batch with new revision from CouchDB
                 var new_batch = new mmria.common.ije.Batch()
                 {
                     id = batch.id,
+                    _rev = put_result.rev,
                     date_created  = batch.date_created,
                     created_by = batch.created_by,
                     date_last_updated  = DateTime.UtcNow,
@@ -479,8 +516,8 @@ public sealed class BatchProcessor : ReceiveActor
                     mor_file_name = batch.mor_file_name,
                     nat_file_name = batch.nat_file_name,
                     fet_file_name = batch.fet_file_name,
-                    StatusInfo = batch.StatusInfo,
-                    record_result = Convert(batch_item_set)
+                    StatusInfo = p_batch.StatusInfo,
+                    record_result = p_batch.record_result
 
                 };
 

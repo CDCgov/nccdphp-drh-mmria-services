@@ -21,6 +21,6 @@ public sealed class StartBatchItemMessage
 
     public List<string> fet { get; init; }
 
+    public string BatchProcessorPath { get; init; }
+
 }
-
-

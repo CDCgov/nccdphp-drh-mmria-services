@@ -941,7 +941,7 @@ public sealed class BatchItemProcessor : ReceiveActor
                 StatusDetail = "matching case found in database"
             };
 
-            // Notify parent BatchProcessor of completion
+            // Notify BatchProcessor of completion
             var completion = new mmria.common.ije.BatchItemComplete()
             {
                 cdc_unique_id = message.cdc_unique_id,
@@ -949,8 +949,9 @@ public sealed class BatchItemProcessor : ReceiveActor
                 error_message = null
             };
             
-            Context.Parent.Tell(completion);
-            Context.Parent.Tell(result);
+            var batchProcessor = Context.ActorSelection(message.BatchProcessorPath);
+            batchProcessor.Tell(completion);
+            batchProcessor.Tell(result);
             return;
         }
         else
@@ -2799,7 +2800,7 @@ if
                 };
             }
 
-            // Notify parent BatchProcessor of completion
+            // Notify BatchProcessor of completion
             var completion = new mmria.common.ije.BatchItemComplete()
             {
                 cdc_unique_id = message.cdc_unique_id,
@@ -2807,8 +2808,9 @@ if
                 error_message = finished.Status == mmria.common.ije.BatchItem.StatusEnum.ImportFailed ? finished.StatusDetail : null
             };
             
-            Context.Parent.Tell(completion);
-            Context.Parent.Tell(finished);
+            var batchProcessor = Context.ActorSelection(message.BatchProcessorPath);
+            batchProcessor.Tell(completion);
+            batchProcessor.Tell(finished);
 
         }
 
