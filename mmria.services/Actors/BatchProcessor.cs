@@ -50,14 +50,36 @@ public sealed class BatchProcessor : ReceiveActor
 
     mmria.common.couchdb.DBConfigurationDetail item_db_info;
 
+    private IActorRef batchItemRouter;
+    private int pending_items = 0;
+
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
+
+    protected override SupervisorStrategy SupervisorStrategy()
+    {
+        return new OneForOneStrategy(
+            maxNrOfRetries: 3,
+            withinTimeRange: TimeSpan.FromMinutes(1),
+            localOnlyDecider: ex =>
+            {
+                Console.WriteLine($"BatchItemProcessor error: {ex.GetType().Name} - {ex.Message}");
+                return Directive.Restart;
+            });
+    }
 
     private Dictionary<string, (string, mmria.common.ije.BatchItem)> batch_item_set = new (StringComparer.OrdinalIgnoreCase);
 
     private mmria.common.ije.Batch batch;
     public BatchProcessor()
     {
+        // Create router pool with 5 workers for bounded parallelism
+        batchItemRouter = Context.ActorOf(
+            Props.Create<RecordsProcessor_Worker.Actors.BatchItemProcessor>()
+                .WithRouter(new Akka.Routing.RoundRobinPool(5)),
+            "batch-item-router"
+        );
+
         Receive<mmria.common.ije.NewIJESet_Message>(message =>
         {
 
@@ -70,6 +92,16 @@ public sealed class BatchProcessor : ReceiveActor
             Process_Message(message);
         });
 
+        Receive<mmria.common.ije.BatchItemComplete>(message =>
+        {
+            pending_items--;
+            Console.WriteLine($"BatchItem completed. Pending: {pending_items}");
+            
+            if (pending_items == 0 && batch != null)
+            {
+                Finalize_Batch();
+            }
+        });
         
         Receive<mmria.common.ije.BatchRemoveDataMessage>(message =>
         {
@@ -220,6 +252,9 @@ public sealed class BatchProcessor : ReceiveActor
 
         if(status_builder.Length == 0)
         {
+            pending_items = batch_item_set.Count;
+            Console.WriteLine($"Starting batch processing with {pending_items} items");
+            
             foreach(var kvp in batch_item_set)
             {
                 var batch_tuple = kvp.Value;
@@ -238,12 +273,12 @@ public sealed class BatchProcessor : ReceiveActor
                         fet = GetAssociatedFet(fet_list, batch_tuple.Item2.CDCUniqueID?.Trim())
                     };
 
-                    var batch_item_processor = Context.ActorOf<RecordsProcessor_Worker.Actors.BatchItemProcessor>(batch_tuple.Item2.CDCUniqueID?.Trim());
-                    batch_item_processor.Tell(StartBatchItemMessage);
+                    batchItemRouter.Tell(StartBatchItemMessage);
                 }
                 catch(Exception ex)
                 {
-
+                    Console.WriteLine($"Error queueing batch item: {ex.Message}");
+                    pending_items--;
                 }
                 
             }
@@ -273,6 +308,8 @@ public sealed class BatchProcessor : ReceiveActor
                 status = batch.Status
             };
             Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
+            
+            // Batch finalization will happen when all items complete
         }
         else
         {
@@ -301,11 +338,6 @@ public sealed class BatchProcessor : ReceiveActor
                 status = batch.Status
             };
             Context.ActorSelection("akka://mmria-actor-system/user/batch-supervisor").Tell(BatchStatusMessage);
-
-            if(save_batch(batch))
-            {
-            }
-            Context.Stop(this.Self);
     
 
         }
@@ -316,6 +348,21 @@ public sealed class BatchProcessor : ReceiveActor
         
     }
 
+    private void Finalize_Batch()
+    {
+        Console.WriteLine($"Finalizing batch {batch.id}");
+        
+        if(save_batch(batch))
+        {
+            Console.WriteLine($"Batch {batch.id} saved successfully");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to save batch {batch.id}");
+        }
+        
+        Context.Stop(this.Self);
+    }
 
     private List<mmria.common.ije.BatchItem> Convert(Dictionary<string,(string, mmria.common.ije.BatchItem)> p_val)
     {

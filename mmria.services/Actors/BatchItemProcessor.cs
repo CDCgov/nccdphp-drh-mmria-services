@@ -710,9 +710,7 @@ public sealed class BatchItemProcessor : ReceiveActor
     {
         Receive<mmria.common.ije.StartBatchItemMessage>(message =>
         {    
-            Console.WriteLine("Message Recieved");
-            //Console.WriteLine(JsonConvert.SerializeObject(message));
-            Sender.Tell("Message Recieved");
+            Console.WriteLine("Message Received");
             Process_Message(message);
         });
     }
@@ -943,7 +941,17 @@ public sealed class BatchItemProcessor : ReceiveActor
                 StatusDetail = "matching case found in database"
             };
 
-            Sender.Tell(result);
+            // Notify parent BatchProcessor of completion
+            var completion = new mmria.common.ije.BatchItemComplete()
+            {
+                cdc_unique_id = message.cdc_unique_id,
+                success = true,
+                error_message = null
+            };
+            
+            Context.Parent.Tell(completion);
+            Context.Parent.Tell(result);
+            return;
         }
         else
         {
@@ -970,7 +978,7 @@ public sealed class BatchItemProcessor : ReceiveActor
                 StatusDetail = "Inprocess of creating new case"
             };
 
-            Sender.Tell(current_status);
+            // Note: Intermediate status not sent - final status sent at completion
 
 
             var new_case = new System.Dynamic.ExpandoObject();
@@ -2791,9 +2799,16 @@ if
                 };
             }
 
-            Sender.Tell(finished);
-
-            Context.Stop(this.Self);
+            // Notify parent BatchProcessor of completion
+            var completion = new mmria.common.ije.BatchItemComplete()
+            {
+                cdc_unique_id = message.cdc_unique_id,
+                success = finished.Status != mmria.common.ije.BatchItem.StatusEnum.ImportFailed,
+                error_message = finished.Status == mmria.common.ije.BatchItem.StatusEnum.ImportFailed ? finished.StatusDetail : null
+            };
+            
+            Context.Parent.Tell(completion);
+            Context.Parent.Tell(finished);
 
         }
 
