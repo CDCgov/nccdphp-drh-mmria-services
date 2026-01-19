@@ -4,13 +4,13 @@ WORKDIR /src
 
 # Copy the mmria.services project file first to leverage layer caching for restores.
 # (COPY with a wildcard so the same Dockerfile works if the csproj name changes slightly)
-COPY mmria.services/*.csproj ./mmria.services/
+COPY source-code/mmria/mmria.services/*.csproj ./source-code/mmria/mmria.services/
 
 # Copy shared code and the rest of mmria source tree (needed for project references)
-COPY mmria/ ./mmria/
+COPY source-code/mmria/ ./source-code/mmria/
 
 USER root
-WORKDIR /src/mmria.services
+WORKDIR /src/source-code/mmria/mmria.services
 
 # Restore (will use the cached layer when csproj hasn't changed)
 RUN dotnet restore
@@ -23,7 +23,7 @@ USER 1001
 # ----- Stage 2: Publish -----
 FROM build AS publish
 USER root
-WORKDIR /src/mmria.services
+WORKDIR /src/source-code/mmria/mmria.services
 
 # Publish the specific target framework to reduce final image size
 RUN dotnet publish -c Release -f net9.0 -o /app/publish
