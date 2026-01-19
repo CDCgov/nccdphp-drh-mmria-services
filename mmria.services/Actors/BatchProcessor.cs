@@ -105,11 +105,26 @@ public sealed class BatchProcessor : ReceiveActor
         var fet_length_is_valid = validate_length(message?.fet?.Split("\n"), fet_max_length);
 
 
-        var patt = new System.Text.RegularExpressions.Regex("[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(([A-Z,a-z]{2})|([Tt][Ee][Nn][Aa][Nn][Tt][1-5]?)).[mM][oO][rR]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var test_tenants = new string[] {"tenant1","tenant2","tenant3","tenant4","tenant5"}; 
 
-        if (patt.Match(message.mor_file_name).Length == 0) 
+        // Check if filename contains any tenant string
+        if (test_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
         {
-            status_builder.AppendLine("mor file name format incorrect. File name must be in Year_Month_Day_StateCode format. (e.g. 2020_2021_01_01_KS.mor");
+            // Tenant filename validation
+            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!patt.IsMatch(message.mor_file_name)) 
+            {
+                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5] format. (e.g. 2026_2026_01_18_TENANT2.MOR)");
+            }
+        }
+        else
+        {
+            // Regular state code validation
+            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z]{2,9}.[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!patt.IsMatch(message.mor_file_name)) 
+            {
+                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_StateCode format. (e.g. 2020_2021_01_01_KS.mor)");
+            }
         }
 
         if(!mor_length_is_valid) status_builder.AppendLine("mor length is invalid.");
