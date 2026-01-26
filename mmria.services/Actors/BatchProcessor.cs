@@ -138,20 +138,27 @@ public sealed class BatchProcessor : ReceiveActor
 
 
         var test_tenants = new string[] {"tenant1","tenant2","tenant3","tenant4","tenant5"}; 
+        var qa_tenants = new string[] {"tenant1qa","tenant2qa","tenant3qa","tenant4qa","tenant5qa"}; 
 
-        // Check if filename contains any tenant string
-        if (test_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
+        // Check QA tenants FIRST (more specific)
+        if (qa_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
         {
-            // Tenant filename validation
+            var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]qa).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!patt.IsMatch(message.mor_file_name)) 
+            {
+                status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5]QA format. (e.g. 2026_2026_01_18_TENANT2QA.MOR)");
+            }
+        }
+        else if (test_tenants.Any(t => message.mor_file_name.ToLower().Contains(t)))
+        {
             var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_(tenant[1-5]).[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (!patt.IsMatch(message.mor_file_name)) 
             {
                 status_builder.AppendLine("mor file name format incorrect. File name must be in ####_20##_Year_Month_Day_TENANT[1-5] format. (e.g. 2026_2026_01_18_TENANT2.MOR)");
             }
-        }
-        else
+        }        
+        else // Regular state codes (remove the duplicate qa_tenants check on line 159)
         {
-            // Regular state code validation
             var patt = new System.Text.RegularExpressions.Regex("^[0-9]{4}_20[0-9]{2}_[0-2][0-9]_[0-3][0-9]_[A-Z]{2,9}.[mM][oO][rR]$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             if (!patt.IsMatch(message.mor_file_name)) 
             {
