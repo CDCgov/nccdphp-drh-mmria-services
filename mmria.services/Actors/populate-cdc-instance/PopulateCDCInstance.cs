@@ -49,7 +49,7 @@ public sealed class PopulateCDCInstance : ReceiveActor
 
              mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
 
-             if(!db_config_set.detail_list.ContainsKey("cdc"))
+             if(!db_config_set.detail_list.ContainsKey("cdc") && !db_config_set.detail_list.ContainsKey("cdcqa"))
              {
                 throw new Exception(@"Exception: db_config_set.detail_list.key missing for cdc");
              }
@@ -61,7 +61,7 @@ public sealed class PopulateCDCInstance : ReceiveActor
 
              string metadata_release_version_name = db_config_set.name_value["metadata_version"];
 
-             var cdc_connection = db_config_set.detail_list["cdc"];
+             var cdc_connection = db_config_set.detail_list.ContainsKey("cdc") ? db_config_set.detail_list["cdc"] : db_config_set.detail_list["cdcqa"];
 
              var cdc_db_url = $"{cdc_connection.url}/mmrds";
 
