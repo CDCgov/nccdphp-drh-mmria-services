@@ -40,219 +40,15 @@ public sealed class PopulateCDCInstance : ReceiveActor
             Process_Message(message);
         });
     }
-
+    
     private void Process_Message(mmria.common.metadata.Populate_CDC_Instance message)
     {
-        var operationId = Guid.NewGuid().ToString("N")[..8];
-        var timer = System.Diagnostics.Stopwatch.StartNew();
-        
-        Console.WriteLine($"[{operationId}] PopulateCDCInstance START - States to process: {message.state_list.Count(s => s.is_included)}");
+        var startTime = DateTime.Now;
+        Console.WriteLine($"[{startTime:yyyy-MM-dd HH:mm:ss}] === Starting CDC Instance Population ===");
+        Console.WriteLine($"[{startTime:yyyy-MM-dd HH:mm:ss}] Total states to process: {message.state_list.Count}");
         
         try
-        {
-            mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
-
-            // Validation with context
-            if(!db_config_set.detail_list.ContainsKey("cdc") && !db_config_set.detail_list.ContainsKey("cdcqa"))
-            {
-                Console.WriteLine($"[{operationId}] FATAL: CDC configuration missing - Available keys: {string.Join(", ", db_config_set.detail_list.Keys)}");
-                throw new Exception(@"Exception: db_config_set.detail_list.key missing for cdc");
-            }
-
-            if(!db_config_set.name_value.ContainsKey("metadata_version"))
-            {
-                Console.WriteLine($"[{operationId}] FATAL: metadata_version missing - Available keys: {string.Join(", ", db_config_set.name_value.Keys)}");
-                throw new Exception(@"Exception: db_config_set.name_value_key missing for metadata_version");
-            }
-
-            string metadata_version = db_config_set.name_value["metadata_version"];
-            var cdc_conn = db_config_set.detail_list.ContainsKey("cdc") ? db_config_set.detail_list["cdc"] : db_config_set.detail_list["cdcqa"];
-            var cdc_db_url = $"{cdc_conn.url}/mmrds";
-
-            Console.WriteLine($"[{operationId}] Config loaded - CDC: {cdc_conn.url}, Metadata: {metadata_version}");
-
-            // Database initialization
-            Console.WriteLine($"[{operationId}] Reinitializing mmrds database...");
-            try { new mmria.getset.cURL("DELETE", null, cdc_db_url, null, cdc_conn.user_name, cdc_conn.user_value).execute(); } 
-            catch { Console.WriteLine($"[{operationId}] mmrds didn't exist (expected on first run)"); }
-
-            new mmria.getset.cURL("PUT", null, cdc_db_url, null, cdc_conn.user_name, cdc_conn.user_value).execute();
-            Console.WriteLine($"[{operationId}] mmrds created, setting security...");
-            
-            new mmria.getset.cURL("PUT", null, $"{cdc_db_url}/_security", 
-                "{\"admins\":{\"names\":[],\"roles\":[\"form_designer\"]},\"members\":{\"names\":[],\"roles\":[\"abstractor\",\"data_analyst\",\"timer\"]}}", 
-                cdc_conn.user_name, cdc_conn.user_value).execute();
-
-            // Design documents
-            string current_dir = AppContext.BaseDirectory;
-            if(!System.IO.Directory.Exists(System.IO.Path.Combine(current_dir, "database-scripts")))
-                current_dir = System.IO.Directory.GetCurrentDirectory();
-
-            Console.WriteLine($"[{operationId}] Installing design documents from: {current_dir}");
-            
-            try 
-            {
-                using (var sr = new System.IO.StreamReader(System.IO.Path.Combine(current_dir, "database-scripts/case_design_sortable.json")))
-                    new mmria.getset.cURL("PUT", null, $"{cdc_conn.url}/mmrds/_design/sortable", sr.ReadToEnd(), cdc_conn.user_name, cdc_conn.user_value).execute();
-
-                using (var sr = new System.IO.StreamReader(System.IO.Path.Combine(current_dir, "database-scripts/case_store_design_auth.json")))
-                    new mmria.getset.cURL("PUT", null, $"{cdc_conn.url}/mmrds/_design/auth", sr.ReadToEnd(), cdc_conn.user_name, cdc_conn.user_value).execute();
-                
-                Console.WriteLine($"[{operationId}] Design documents installed successfully");
-            }
-            catch (Exception ex) 
-            {
-                Console.WriteLine($"[{operationId}] ERROR installing design docs: {ex.Message}");
-            }
-
-            // Auxiliary databases (de_id, report)
-            Console.WriteLine($"[{operationId}] Setting up auxiliary databases...");
-            foreach(var dbName in new[] { "de_id", "report" })
-            {
-                try 
-                { 
-                    new mmria.getset.cURL("DELETE", null, $"{cdc_conn.url}/{dbName}", null, cdc_conn.user_name, cdc_conn.user_value).execute();
-                    Console.WriteLine($"[{operationId}] Deleted existing {dbName}");
-                }
-                catch { /* expected if doesn't exist */ }
-                
-                new mmria.getset.cURL("PUT", null, $"{cdc_conn.url}/{dbName}", null, cdc_conn.user_name, cdc_conn.user_value).execute();
-                Console.WriteLine($"[{operationId}] Created {dbName}");
-            }
-
-            // de_id design doc
-            try 
-            {
-                using (var sr = new System.IO.StreamReader(System.IO.Path.Combine(current_dir, "database-scripts/case_design_sortable.json")))
-                    new mmria.getset.cURL("PUT", null, $"{cdc_conn.url}/de_id/_design/sortable", sr.ReadToEnd(), cdc_conn.user_name, cdc_conn.user_value).execute();
-            } 
-            catch (Exception ex) { Console.WriteLine($"[{operationId}] WARN: de_id design doc failed - {ex.Message}"); }
-
-            // Report index
-            try
-            {
-                var index = new mmria.server.utils.c_document_sync_all.Report_Opioid_Index_Struct();
-                new mmria.getset.cURL("POST", null, $"{cdc_conn.url}/report/_index", 
-                    Newtonsoft.Json.JsonConvert.SerializeObject(index), cdc_conn.user_name, cdc_conn.user_value).execute();
-            }
-            catch (Exception ex) { Console.WriteLine($"[{operationId}] WARN: report index failed - {ex.Message}"); }
-
-            // Process states
-            var stats = new { success = 0, failed = 0, skipped = 0 };
-            var included = message.state_list.Where(s => s.is_included).ToList();
-            
-            Console.WriteLine($"[{operationId}] BEGIN state processing - {included.Count} states included, {message.state_list.Count - included.Count} excluded");
-            
-            for (var i = 0; i < message.state_list.Count; i++)
-            {
-                if(!message.state_list[i].is_included)
-                {
-                    stats = new { stats.success, stats.failed, skipped = stats.skipped + 1 };
-                    continue;
-                }
-
-                var state = message.state_list[i].prefix;
-                var stateTimer = System.Diagnostics.Stopwatch.StartNew();
-                Console.WriteLine($"[{operationId}] [{i+1}/{included.Count}] Processing: {state}");
-
-                try
-                {
-                    if(!db_config_set.detail_list.ContainsKey(state))
-                    {
-                        Console.WriteLine($"[{operationId}] ERROR: {state} not in config, skipping");
-                        stats = new { stats.success, failed = stats.failed + 1, stats.skipped };
-                        continue;
-                    }
-
-                    var db = db_config_set.detail_list[state];
-                    var caseIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                    // Fetch case IDs
-                    try
-                    {
-                        var url = !string.IsNullOrWhiteSpace(db.prefix)
-                            ? $"{db.url}/{db.prefix}_mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000"
-                            : $"{db.url}/mmrds/_design/sortable/_view/by_date_created?skip=0&take=250000";
-
-                        var response = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.case_view_response>(
-                            new mmria.getset.cURL("GET", null, url, null, db.user_name, db.user_value).execute());
-
-                        foreach (var row in response.rows) caseIds.Add(row.id);
-                        
-                        Console.WriteLine($"[{operationId}] {state}: {caseIds.Count} cases found");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[{operationId}] ERROR fetching {state} cases: {ex.Message}");
-                        stats = new { stats.success, failed = stats.failed + 1, stats.skipped };
-                        continue;
-                    }
-
-                    // Process each case
-                    int processed = 0, errors = 0;
-                    foreach(string caseId in caseIds)
-                    {
-                        try
-                        {
-                            var url = !string.IsNullOrWhiteSpace(db.prefix)
-                                ? $"{db.url}/{db.prefix}_mmrds/{caseId}"
-                                : $"{db.url}/mmrds/{caseId}";
-
-                            var caseDoc = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(
-                                new mmria.getset.cURL("GET", null, url, null, db.user_name, db.user_value).execute());
-                            
-                            var dict = caseDoc as IDictionary<string, object>;
-                            if(dict == null || !dict.ContainsKey("_id") || dict["_id"]?.ToString().StartsWith("_design") == true)
-                                continue;
-
-                            var docJson = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
-                            var deIdJson = new mmria.server.utils.c_cdc_de_identifier(docJson, state, cdc_conn, metadata_version).executeAsync().GetAwaiter().GetResult();
-                            var deIdDict = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Dynamic.ExpandoObject>(deIdJson) as IDictionary<string,object>;
-                            
-                            if(deIdDict != null)
-                            {
-                                dict["_rev"] = null;
-                                Put_Document(Newtonsoft.Json.JsonConvert.SerializeObject(deIdDict), caseId, $"{cdc_conn.url}/mmrds/{caseId}", cdc_conn.user_name, cdc_conn.user_value);
-                                processed++;
-                            }
-
-                            if(processed % 100 == 0) 
-                                Console.WriteLine($"[{operationId}] {state}: {processed}/{caseIds.Count} cases processed");
-                        }
-                        catch(Exception ex)
-                        {
-                            errors++;
-                            if(errors <= 3) Console.WriteLine($"[{operationId}] Case error {state}/{caseId}: {ex.Message}");
-                        }
-                    }
-                    
-                    Console.WriteLine($"[{operationId}] {state} COMPLETE: {processed} success, {errors} errors ({stateTimer.ElapsedMilliseconds}ms)");
-                    stats = new { success = stats.success + 1, stats.failed, stats.skipped };
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine($"[{operationId}] FATAL ERROR {state}: {ex.Message}");
-                    stats = new { stats.success, failed = stats.failed + 1, stats.skipped };
-                }
-            }
-
-            timer.Stop();
-            Console.WriteLine($"[{operationId}] COMPLETE - Success: {stats.success}, Failed: {stats.failed}, Skipped: {stats.skipped} ({timer.Elapsed:mm\\:ss})");
-            Sender.Tell(new Status("Finished", $"Processed {stats.success} states in {timer.Elapsed:mm\\:ss}"));
-        }
-        catch(Exception ex)
-        {
-            timer.Stop();
-            Console.WriteLine($"[{operationId}] FATAL FAILURE after {timer.Elapsed:mm\\:ss}: {ex.Message}\n{ex.StackTrace}");
-            Sender.Tell(new Status("Error", ex.Message));
-        }
-
-        Context.Stop(this.Self);
-    }
-    private void Process_Message_old(mmria.common.metadata.Populate_CDC_Instance message)
-    {
-        try
-        {
+        {            
 
              mmria.common.couchdb.ConfigurationSet db_config_set = mmria.services.vitalsimport.Program.DbConfigSet;
 
@@ -394,7 +190,15 @@ public sealed class PopulateCDCInstance : ReceiveActor
             
             }
 
-
+            Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Database setup completed successfully");
+            Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Starting state processing...");
+            
+            // Initialize counters
+            int totalStatesProcessed = 0;
+            int totalStatesSkipped = 0;
+            int totalCasesProcessed = 0;
+            int totalCasesSucceeded = 0;
+            int totalCasesFailed = 0;
                         
             for (var i = 0; i < message.state_list.Count; i++)
             {
@@ -403,10 +207,22 @@ public sealed class PopulateCDCInstance : ReceiveActor
                 (
                     message.state_list[i].is_included == false 
                 ) 
-                continue;
+                {
+                    totalStatesSkipped++;
+                    Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Skipping state {i + 1}/{message.state_list.Count}: {message.state_list[i].prefix} (not included)");
+                    continue;
+                }
 
 
                 var instance_name = message.state_list[i].prefix;
+                Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Processing state {i + 1}/{message.state_list.Count}: {instance_name}");
+                
+                // Initialize per-state counters
+                int stateCasesProcessed = 0;
+                int stateCasesSucceeded = 0;
+                int stateCasesFailed = 0;
+                int stateCasesSkipped = 0;
+                
                 try
                 {
                     if(db_config_set.detail_list.ContainsKey(instance_name))
@@ -440,9 +256,19 @@ public sealed class PopulateCDCInstance : ReceiveActor
                             Console.WriteLine(ex);
                         }
 
+                        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Retrieved {Custom_Case_Id_List.Count} cases for state: {instance_name}");
+                        
                         //foreach(var case_response_item in case_response.rows)
                         foreach(string case_id in Custom_Case_Id_List)
                         {
+                            stateCasesProcessed++;
+                            
+                            // Log progress every 50 cases
+                            if (stateCasesProcessed % 50 == 0 || stateCasesProcessed == 1)
+                            {
+                                int remaining = Custom_Case_Id_List.Count - stateCasesProcessed;
+                                Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] State {instance_name}: Processing case {stateCasesProcessed}/{Custom_Case_Id_List.Count} (Remaining: {remaining})");
+                            }
 
                             string URL = $"{db_info.url}/mmrds/{case_id}";
                             if(!string.IsNullOrWhiteSpace(db_info.prefix))
@@ -463,6 +289,7 @@ public sealed class PopulateCDCInstance : ReceiveActor
                                 case_doc["_id"].ToString().StartsWith("_design", StringComparison.InvariantCultureIgnoreCase)
                             )
                             {
+                                stateCasesSkipped++;
                                 continue;
                             }
 
@@ -482,6 +309,7 @@ public sealed class PopulateCDCInstance : ReceiveActor
 
                             if(de_identified_dictionary == null)
                             {
+                                stateCasesSkipped++;
                                 continue;
                             }
                             /*
@@ -506,9 +334,11 @@ public sealed class PopulateCDCInstance : ReceiveActor
                                 )
                                 {
                                     // do nothing for now
+                                    stateCasesSucceeded++;
                                 }
                                 else
                                 {
+                                    stateCasesSucceeded++;
                                     /*
                                     var result = Newtonsoft.Json.JsonConvert.DeserializeObject<mmria.common.model.couchdb.document_put_response>(put_result_string);
                                     
@@ -529,26 +359,47 @@ public sealed class PopulateCDCInstance : ReceiveActor
                             }
                             catch(Exception ex)
                             {
-                                Console.WriteLine($"Case save Problem:{instance_name} {_id}");
+                                stateCasesFailed++;
+                                Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Case save Problem:{instance_name} {_id}");
                                 Console.WriteLine(ex);
                             }
 
                         }
+                        
+                        // Log state completion
+                        totalStatesProcessed++;
+                        totalCasesProcessed += stateCasesProcessed;
+                        totalCasesSucceeded += stateCasesSucceeded;
+                        totalCasesFailed += stateCasesFailed;
+                        
+                        int statesRemaining = message.state_list.Count - (totalStatesProcessed + totalStatesSkipped);
+                        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Completed state: {instance_name}");
+                        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}]   Cases processed: {stateCasesProcessed}, Succeeded: {stateCasesSucceeded}, Failed: {stateCasesFailed}, Skipped: {stateCasesSkipped}");
+                        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}]   States remaining: {statesRemaining}");
                     }
                 }
                 catch(Exception ex)
                 {
-                    Console.WriteLine($"Problem pulling instance:{instance_name}");
+                    Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Problem pulling instance:{instance_name}");
                     Console.WriteLine(ex);
                 }
                 
             }
 
+            var endTime = DateTime.Now;
+            var duration = endTime - startTime;
+            Console.WriteLine($"[{endTime:yyyy-MM-dd HH:mm:ss}] === CDC Instance Population Completed ===");
+            Console.WriteLine($"[{endTime:yyyy-MM-dd HH:mm:ss}] Total processing time: {duration.Hours}h {duration.Minutes}m {duration.Seconds}s");
+            Console.WriteLine($"[{endTime:yyyy-MM-dd HH:mm:ss}] States processed: {totalStatesProcessed}, Skipped: {totalStatesSkipped}");
+            Console.WriteLine($"[{endTime:yyyy-MM-dd HH:mm:ss}] Total cases processed: {totalCasesProcessed}");
+            Console.WriteLine($"[{endTime:yyyy-MM-dd HH:mm:ss}] Total cases succeeded: {totalCasesSucceeded}");
+            Console.WriteLine($"[{endTime:yyyy-MM-dd HH:mm:ss}] Total cases failed: {totalCasesFailed}");
 
             Sender.Tell(new Status("Finished", ""));
         }
         catch(Exception ex)
         {
+            Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR: Fatal exception in Process_Message");
             Console.WriteLine(ex);
             Sender.Tell(new Status("Error", ex.Message));
         }
