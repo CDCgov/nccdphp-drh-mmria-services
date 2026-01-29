@@ -52,6 +52,16 @@ public sealed class BatchProcessor : ReceiveActor
 
     private IActorRef batchItemRouter;
     private int pending_items = 0;
+    
+    // Chunk-based processing fields
+    private int _chunkSize = 10; // Default chunk size
+    private List<KeyValuePair<string, (string, mmria.common.ije.BatchItem)>> _remainingItems = new();
+    private int _currentChunkPending = 0;
+    private mmria.common.ije.NewIJESet_Message _currentMessage;
+    private string[] _nat_list;
+    private string[] _fet_list;
+    private string _reportingState;
+    private DateTime _importDate;
 
     protected override void PreStart() => Console.WriteLine("Process_Message started");
     protected override void PostStop() => Console.WriteLine("Process_Message stopped");
@@ -95,8 +105,17 @@ public sealed class BatchProcessor : ReceiveActor
         Receive<mmria.common.ije.BatchItemComplete>(message =>
         {
             pending_items--;
-            Console.WriteLine($"BatchItem completed. Pending: {pending_items}");
+            _currentChunkPending--;
             
+            Console.WriteLine($"BatchItem completed. Total pending: {pending_items}, Chunk pending: {_currentChunkPending}, Remaining: {_remainingItems.Count}");
+            
+            // When current chunk completes, dispatch next chunk
+            if (_currentChunkPending == 0 && _remainingItems.Count > 0)
+            {
+                DispatchNextChunk();
+            }
+            
+            // Finalize when all items complete
             if (pending_items == 0 && batch != null)
             {
                 Finalize_Batch();
@@ -259,37 +278,19 @@ public sealed class BatchProcessor : ReceiveActor
 
         if(status_builder.Length == 0)
         {
+            // Store message and items for chunked processing
+            _currentMessage = message;
+            _remainingItems = batch_item_set.ToList();
+            _nat_list = nat_list;
+            _fet_list = fet_list;
+            _reportingState = ReportingState;
+            _importDate = ImportDate;
             pending_items = batch_item_set.Count;
-            Console.WriteLine($"Starting batch processing with {pending_items} items");
             
-            foreach(var kvp in batch_item_set)
-            {
-                var batch_tuple = kvp.Value;
-                try
-                {
-                    var StartBatchItemMessage = new mmria.common.ije.StartBatchItemMessage()
-                    {
-                        case_folder = message.case_folder,
-                        cdc_unique_id = batch_tuple.Item2.CDCUniqueID,
-                        record_id = batch_tuple.Item2.mmria_record_id,
-                        ImportDate = ImportDate,
-                        ImportFileName = message.mor_file_name,
-                        host_state = ReportingState,
-                        mor = batch_tuple.Item1,
-                        nat = GetAssociatedNat(nat_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
-                        fet = GetAssociatedFet(fet_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
-                        BatchProcessorPath = Self.Path.ToStringWithAddress()
-                    };
-
-                    batchItemRouter.Tell(StartBatchItemMessage);
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine($"Error queueing batch item: {ex.Message}");
-                    pending_items--;
-                }
-                
-            }
+            Console.WriteLine($"Starting chunked batch processing with {pending_items} items (chunk size: {_chunkSize})");
+            
+            // Dispatch first chunk
+            DispatchNextChunk();
 
 
             batch = new mmria.common.ije.Batch()
@@ -357,6 +358,48 @@ public sealed class BatchProcessor : ReceiveActor
 
         
         
+    }
+
+    private void DispatchNextChunk()
+    {
+        var itemsToDispatch = _remainingItems.Take(_chunkSize).ToList();
+        
+        if (itemsToDispatch.Count == 0)
+            return;
+
+        _currentChunkPending = itemsToDispatch.Count;
+        _remainingItems = _remainingItems.Skip(_chunkSize).ToList();
+
+        Console.WriteLine($"Dispatching chunk: {itemsToDispatch.Count} items, {_remainingItems.Count} remaining");
+
+        foreach (var kvp in itemsToDispatch)
+        {
+            var batch_tuple = kvp.Value;
+            try
+            {
+                var StartBatchItemMessage = new mmria.common.ije.StartBatchItemMessage()
+                {
+                    case_folder = _currentMessage.case_folder,
+                    cdc_unique_id = batch_tuple.Item2.CDCUniqueID,
+                    record_id = batch_tuple.Item2.mmria_record_id,
+                    ImportDate = _importDate,
+                    ImportFileName = _currentMessage.mor_file_name,
+                    host_state = _reportingState,
+                    mor = batch_tuple.Item1,
+                    nat = GetAssociatedNat(_nat_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
+                    fet = GetAssociatedFet(_fet_list, batch_tuple.Item2.CDCUniqueID?.Trim()),
+                    BatchProcessorPath = Self.Path.ToStringWithAddress()
+                };
+
+                batchItemRouter.Tell(StartBatchItemMessage);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Error queueing batch item: {ex.Message}");
+                pending_items--;
+                _currentChunkPending--;
+            }
+        }
     }
 
     private void Finalize_Batch()
