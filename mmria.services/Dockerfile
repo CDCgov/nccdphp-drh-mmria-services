@@ -6,8 +6,8 @@ WORKDIR /src
 # (COPY with a wildcard so the same Dockerfile works if the csproj name changes slightly)
 COPY mmria.services/*.csproj ./mmria.services/
 
-# Copy common dependencies (mmria.common and mmria.getset)
-COPY common/ ./common/
+# Copy common dependencies (mmria.common and mmria.getset) from canonical location
+COPY ../nccdphp-drh-mmria-common/ ./nccdphp-drh-mmria-common/
 
 # Copy the rest of mmria.services source
 COPY mmria.services/ ./mmria.services/
